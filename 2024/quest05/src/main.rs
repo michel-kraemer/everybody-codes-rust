@@ -2,50 +2,35 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 
 fn parse(filename: &str) -> Vec<Vec<u64>> {
+    let mut cols = vec![Vec::new(); 4];
     let input = fs::read_to_string(filename).expect("Could not read file");
-    let lines = input
-        .lines()
-        .map(|l| {
-            l.split(" ")
-                .map(|i| i.parse::<u64>().unwrap())
-                .collect::<Vec<_>>()
-        })
-        .collect::<Vec<_>>();
-
-    let mut cols: Vec<Vec<u64>> = Vec::new();
-    for l in lines {
-        for (x, n) in l.iter().enumerate() {
-            if cols.len() < x + 1 {
-                cols.resize(x + 1, Vec::new());
-            }
-            cols[x].push(*n);
+    for l in input.lines() {
+        for (i, n) in l.split_whitespace().enumerate() {
+            let n = n.parse::<u64>().unwrap();
+            cols[i].push(n);
         }
     }
-
     cols
 }
 
 fn dance(cols: &mut [Vec<u64>], round: usize) {
-    let n_cols = cols.len();
-    let clapper = cols[round % n_cols].remove(0);
-
-    let mut i = 0i64;
-    let mut di = 1i64;
-    for _ in 0..clapper - 1 {
-        i += di;
-        if i == 0 || i == cols[(round + 1) % n_cols].len() as i64 {
-            di = -di;
-        }
-    }
-    cols[(round + 1) % n_cols].insert(i as usize, clapper);
+    let clapper = cols[round % 4].remove(0);
+    let cl = cols[(round + 1) % 4].len() as u64;
+    let i = if ((clapper - 1) / cl) % 2 == 0 {
+        (clapper - 1) % cl
+    } else {
+        cl - (clapper - 1) % cl
+    };
+    cols[(round + 1) % 4].insert(i as usize, clapper);
 }
 
 fn call(cols: &[Vec<u64>]) -> u64 {
-    let mut total = String::new();
+    let mut result = 0;
     for col in cols {
-        total.push_str(&format!("{}", col[0]));
+        result *= 10u64.pow(col[0].ilog10() + 1);
+        result += col[0];
     }
-    total.parse::<u64>().unwrap()
+    result
 }
 
 fn main() {
