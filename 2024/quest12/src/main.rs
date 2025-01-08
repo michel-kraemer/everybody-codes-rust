@@ -16,38 +16,66 @@ fn parse_file(filename: &str) -> Vec<(i32, i32, i32)> {
     result
 }
 
-/// Simulate catapult throw starting at (cx, cy) with the given strength and
-/// check if the projectile is exactly at (optx, opty) after the given time
-fn can_hit(mut cx: i32, mut cy: i32, optx: i32, opty: i32, strength: i32, time: i32) -> bool {
+/// Extrapolate height of projectile fired from height `cy` with the given
+/// `strength` after the given `time`
+fn extrapolate(mut cy: i32, strength: i32, time: i32) -> i32 {
     let mut remaining_time = time;
 
     // positive diagonal
     let d1 = strength.min(remaining_time);
-    cx += d1;
     cy += d1;
     remaining_time -= d1;
-    if remaining_time == 0 && cx == optx && cy == opty {
-        return true;
+    if remaining_time == 0 {
+        return cy;
     }
 
     // horizontal
     let d2 = strength.min(remaining_time);
-    cx += d2;
     remaining_time -= d2;
-    if remaining_time == 0 && cx == optx && cy == opty {
-        return true;
+    if remaining_time == 0 {
+        return cy;
     }
 
     // negative diagonal
-    let d3 = cy.min(remaining_time);
-    cx += d3;
-    cy -= d3;
-    remaining_time -= d3;
-    if remaining_time == 0 && cx == optx && cy == opty {
-        return true;
+    cy - remaining_time
+}
+
+/// Check if the tower at (cx, cy) can hit the target at (tx, ty), and if so,
+/// return the required strength
+fn can_hit(cx: i32, cy: i32, tx: i32, ty: i32) -> Option<i32> {
+    // time until collision
+    let time = tx - cx;
+
+    let max_height = cy + time;
+    if max_height == ty {
+        // tower can hit the target in a straight line
+        return Some(time);
     }
 
-    false
+    if max_height < ty {
+        // tower can never fire high enough to git the target
+        return None;
+    }
+
+    // use binary search to find the required strength
+    let mut min = 1;
+    let mut max = time;
+    while min < max {
+        let strength = (min + max) / 2;
+        let hy = extrapolate(cy, strength, time);
+        if hy == ty {
+            // hit!
+            return Some(strength);
+        }
+        if hy > ty {
+            max = strength;
+        } else {
+            min = strength + 1;
+        }
+    }
+
+    // tower has always missed the target
+    None
 }
 
 fn main() {
@@ -57,11 +85,8 @@ fn main() {
         let mut total1 = 0;
         for tower in [0, 1, 2] {
             for &(tx, ty, hit_points) in &targets {
-                for strength in 1..=tx {
-                    if can_hit(0, tower, tx, ty, strength, tx) {
-                        total1 += (tower + 1) * strength * hit_points;
-                        break;
-                    }
+                if let Some(strength) = can_hit(0, tower, tx, ty) {
+                    total1 += (tower + 1) * strength * hit_points;
                 }
             }
         }
@@ -82,16 +107,11 @@ fn main() {
         let optx = mx / 2;
         let opty = my - (mx - optx);
 
-        // time until collision
-        let time = optx;
-
         let mut min = i32::MAX;
         for tower in [0, 1, 2] {
-            for strength in 1..=time {
-                if can_hit(0, tower, optx, opty, strength, time) {
-                    min = min.min((tower + 1) * strength);
-                    break;
-                }
+            if let Some(strength) = can_hit(0, tower, optx, opty) {
+                min = min.min((tower + 1) * strength);
+                break;
             }
         }
         total3 += min;
