@@ -1,23 +1,14 @@
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+use bucket_queue::BucketQueue;
+
+mod bucket_queue;
+
+#[derive(Clone, Copy)]
 struct Edge {
     dist: usize,
     to: usize,
-}
-
-impl Ord for Edge {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.dist.cmp(&other.dist)
-    }
-}
-
-impl PartialOrd for Edge {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
 }
 
 struct Star {
@@ -47,10 +38,12 @@ fn main() {
 
         // find edges between stars (for part 3, only consider edges shorter than 6)
         let mut edges = vec![Vec::new(); stars.len()];
+        let mut max_dist = 0;
         for i in 0..stars.len() {
             for j in i + 1..stars.len() {
                 let d = stars[i].dist(&stars[j]);
                 if part != 3 || d < 6 {
+                    max_dist = max_dist.max(d);
                     edges[i].push(Edge { dist: d, to: j });
                     edges[j].push(Edge { dist: d, to: i });
                 }
@@ -68,13 +61,13 @@ fn main() {
             remaining_stars.remove(&start);
 
             // perform Prim's algorithm to construct minimum spanning tree
-            let mut queue = BinaryHeap::new();
-            queue.push(Reverse(Edge { dist: 0, to: start }));
+            let mut bucket_queue = BucketQueue::new(max_dist);
+            bucket_queue.insert(0, start);
 
             let mut constellation: Vec<usize> = Vec::new();
             shortest_dist[start] = 0;
 
-            while let Some(Reverse(Edge { to: s, .. })) = queue.pop() {
+            while let Some(s) = bucket_queue.pop() {
                 if in_constellation[s] {
                     // shortest distance has already been calculated
                     continue;
@@ -92,7 +85,7 @@ fn main() {
                     if !in_constellation[e.to] && shortest_dist[e.to] > e.dist {
                         // ... update its shortest distance and add it to the queue
                         shortest_dist[e.to] = e.dist;
-                        queue.push(Reverse(e));
+                        bucket_queue.insert(e.dist - 1, e.to);
                     }
                 }
             }
