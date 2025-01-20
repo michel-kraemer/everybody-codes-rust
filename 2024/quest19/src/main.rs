@@ -1,6 +1,9 @@
 use std::fs;
 
-fn rotate(grid: &mut [u8], width: usize, x: usize, y: usize, left: bool) {
+fn rotate<T>(grid: &mut [T], width: usize, x: usize, y: usize, left: bool)
+where
+    T: Copy,
+{
     let dx = if left { -1 } else { 1 };
     let mut nx = (x as i32) + dx;
     let mut ny = y - 1;
@@ -24,39 +27,29 @@ fn rotate(grid: &mut [u8], width: usize, x: usize, y: usize, left: bool) {
     grid[ny * width + nx as usize] = sc;
 }
 
-fn decrypt(grid: &mut [u8], width: usize, height: usize, instructions: &[u8]) -> u64 {
-    loop {
-        let mut i = 0;
-        for y in 1..height - 1 {
-            for x in 1..width - 1 {
-                if instructions[i % instructions.len()] == b'L' {
-                    rotate(grid, width, x, y, true);
-                } else {
-                    rotate(grid, width, x, y, false);
-                }
-                i += 1;
+fn decrypt<T>(grid: &mut [T], width: usize, height: usize, instructions: &[u8])
+where
+    T: Copy,
+{
+    let mut i = 0;
+    for y in 1..height - 1 {
+        for x in 1..width - 1 {
+            if instructions[i % instructions.len()] == b'L' {
+                rotate(grid, width, x, y, true);
+            } else {
+                rotate(grid, width, x, y, false);
             }
+            i += 1;
         }
+    }
+}
 
-        // the decrypted message is always 16 digits long
-        for j in 0..grid.len() {
-            if grid[j] == b'>' {
-                let mut m = j + 1;
-                let mut total = 0;
-                let mut len = 0;
-                while m < grid.len() && grid[m].is_ascii_digit() {
-                    total *= 10;
-                    total += (grid[m] - b'0') as u64;
-                    m += 1;
-                    len += 1;
-                }
-                if len == 16 && m < grid.len() && grid[m] == b'<' {
-                    return total;
-                } else {
-                    break;
-                }
-            }
-        }
+fn apply_permutation<T>(dest: &mut [T], src: &[T], permutation: &[usize])
+where
+    T: Copy,
+{
+    for i in 0..src.len() {
+        dest[i] = src[permutation[i]];
     }
 }
 
@@ -75,6 +68,46 @@ fn main() {
             .flat_map(|l| l.as_bytes().iter().copied())
             .collect::<Vec<_>>();
 
-        println!("{}", decrypt(&mut grid, width, height, instructions));
+        let n = match part {
+            1 => 1,
+            2 => 100,
+            _ => 1048576000,
+        };
+
+        // decrypt once to get permutation
+        let mut permutation = (0..grid.len()).collect::<Vec<_>>();
+        decrypt(&mut permutation, width, height, instructions);
+
+        // apply binary exponentiation to get to the answer really fast
+        let mut k = n;
+        while k > 0 {
+            if k & 1 > 0 {
+                // apply permutation to grid
+                let mut ng = vec![b'.'; grid.len()];
+                apply_permutation(&mut ng, &grid, &permutation);
+                grid = ng;
+            }
+
+            // apply permutation to itself
+            let mut np = vec![0; permutation.len()];
+            apply_permutation(&mut np, &permutation, &permutation);
+            permutation = np;
+
+            k >>= 1;
+        }
+
+        // get the decrypted message
+        let mut j = 0;
+        while grid[j] != b'>' {
+            j += 1;
+        }
+        j += 1;
+        let mut total = 0;
+        while grid[j].is_ascii_digit() {
+            total *= 10;
+            total += (grid[j] - b'0') as u64;
+            j += 1;
+        }
+        println!("{}", total);
     }
 }
