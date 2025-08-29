@@ -2,6 +2,9 @@ use std::fs;
 
 use rustc_hash::FxHashSet;
 
+#[cfg(feature = "visualize")]
+use skia_safe::{Color, EncodedImageFormat, Paint, Path, surfaces};
+
 #[derive(Clone, Debug)]
 struct Die {
     faces: Vec<i32>,
@@ -151,4 +154,28 @@ fn main() {
         }
     }
     println!("{num_taken}");
+
+    #[cfg(feature = "visualize")]
+    {
+        let mut surface =
+            surfaces::raster_n32_premul((grid[0].len() as i32, grid.len() as i32)).unwrap();
+        let mut paint = Paint::default();
+        paint.set_color(Color::BLACK);
+        paint.set_anti_alias(false);
+        paint.set_stroke_width(1.0);
+        surface.canvas().clear(Color::WHITE);
+        for y in 0..grid.len() {
+            for x in 0..grid[y].len() {
+                if taken[y][x] {
+                    surface.canvas().draw_point((x as i32, y as i32), &paint);
+                }
+            }
+        }
+        let image = surface.image_snapshot();
+        let mut context = surface.direct_context();
+        let data = image
+            .encode(context.as_mut(), EncodedImageFormat::PNG, None)
+            .unwrap();
+        fs::write("everybody_codes_e2_q03_p3.png", data.as_bytes()).unwrap();
+    }
 }
