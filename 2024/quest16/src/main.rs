@@ -17,7 +17,7 @@ fn parse(filename: &str) -> (Vec<Vec<Vec<u8>>>, Vec<usize>) {
 
     let mut wheels = Vec::new();
     for s in str_wheels.lines() {
-        let n_wheels = (s.len() + 3) / 4;
+        let n_wheels = s.len().div_ceil(4);
         if wheels.len() < n_wheels {
             wheels.resize(n_wheels, Vec::new());
         }

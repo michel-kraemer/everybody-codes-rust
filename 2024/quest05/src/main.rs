@@ -16,7 +16,7 @@ fn parse(filename: &str) -> Vec<Vec<u64>> {
 fn dance(cols: &mut [Vec<u64>], round: usize) {
     let clapper = cols[round % 4].remove(0);
     let cl = cols[(round + 1) % 4].len() as u64;
-    let i = if ((clapper - 1) / cl) % 2 == 0 {
+    let i = if ((clapper - 1) / cl).is_multiple_of(2) {
         (clapper - 1) % cl
     } else {
         cl - (clapper - 1) % cl

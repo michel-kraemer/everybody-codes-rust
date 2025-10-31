@@ -54,7 +54,7 @@ fn main() {
     for l in input.lines() {
         let brightness = l.parse::<u64>().unwrap();
         let mut min_beetles = u64::MAX;
-        for left in (brightness + 1) / 2 - 50..=brightness / 2 {
+        for left in brightness.div_ceil(2) - 50..=brightness / 2 {
             let right = brightness - left;
             if left >= cache.len() as u64 {
                 cache.resize(left as usize + 1, u64::MAX);
