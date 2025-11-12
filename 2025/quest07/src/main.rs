@@ -1,6 +1,6 @@
-use std::{collections::HashMap, fs};
+use std::fs;
 
-fn parse(file: &str) -> (Vec<Vec<char>>, HashMap<char, Vec<char>>) {
+fn parse(file: &str) -> (Vec<Vec<char>>, Vec<Vec<char>>) {
     let input = fs::read_to_string(file).expect("Could not read file");
 
     let (names, rules) = input.split_once("\n\n").unwrap();
@@ -10,30 +10,26 @@ fn parse(file: &str) -> (Vec<Vec<char>>, HashMap<char, Vec<char>>) {
         .map(|n| n.chars().collect())
         .collect::<Vec<_>>();
 
-    let rules = rules
-        .lines()
-        .map(|r| {
-            let (left, right) = r.split_once(" > ").unwrap();
-            let right = right
-                .split(',')
-                .map(|s| {
-                    assert_eq!(1, s.len());
-                    s.chars().next().unwrap()
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(1, left.len());
-            (left.chars().next().unwrap(), right)
-        })
-        .collect();
+    let mut parsed_rules = vec![Vec::new(); 128];
+    for r in rules.lines() {
+        let (left, right) = r.split_once(" > ").unwrap();
+        let right = right
+            .split(',')
+            .map(|s| {
+                assert_eq!(1, s.len());
+                s.chars().next().unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(1, left.len());
+        parsed_rules[left.chars().next().unwrap() as usize] = right;
+    }
 
-    (names, rules)
+    (names, parsed_rules)
 }
 
-fn check_name(name: &[char], rules: &HashMap<char, Vec<char>>) -> bool {
+fn check_name(name: &[char], rules: &[Vec<char>]) -> bool {
     for w in name.windows(2) {
-        if let Some(e) = rules.get(&w[0])
-            && e.contains(&w[1])
-        {
+        if rules[w[0] as usize].contains(&w[1]) {
             // OK
         } else {
             return false;
@@ -42,24 +38,18 @@ fn check_name(name: &[char], rules: &HashMap<char, Vec<char>>) -> bool {
     true
 }
 
-fn dfs(
-    rules: &HashMap<char, Vec<char>>,
-    cur: char,
-    len: usize,
-    cache: &mut HashMap<(char, usize), u64>,
-) -> u64 {
-    if let Some(c) = cache.get(&(cur, len)) {
-        return *c;
+fn dfs(rules: &[Vec<char>], cur: char, len: usize, cache: &mut [u64]) -> u64 {
+    let cidx = (cur as u8 - b'a') as usize * 11 + (len - 1);
+    if cache[cidx] != u64::MAX {
+        return cache[cidx];
     }
     let mut result = if (7..=11).contains(&len) { 1 } else { 0 };
-    if len < 11
-        && let Some(e) = rules.get(&cur)
-    {
-        for &next in e {
+    if len < 11 {
+        for &next in &rules[cur as usize] {
             result += dfs(rules, next, len + 1, cache);
         }
     }
-    cache.insert((cur, len), result);
+    cache[cidx] = result;
     result
 }
 
@@ -84,7 +74,7 @@ fn main() {
     println!("{total}");
 
     // part 3
-    let mut cache = HashMap::new();
+    let mut cache = vec![u64::MAX; 26 * 11];
     let (prefixes, rules) = parse("everybody_codes_e2025_q07_p3.txt");
     let mut total = 0;
     for prefix in &prefixes {
