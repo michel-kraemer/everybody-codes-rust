@@ -57,7 +57,7 @@ fn find_families(members: &mut [FamilyMember]) {
                 continue;
             }
             for parent2 in parent1 + 1..members.len() {
-                if parent2 == child || parent2 == parent1 {
+                if parent2 == child {
                     continue;
                 }
                 if let Some(s) = similarity(
