@@ -135,7 +135,7 @@ fn dfs(
     for x in 0..width {
         let y = state.get(x);
         if y != 0xf {
-            if y + 1 == height {
+            if y + 1 == height || hideouts[((y + 1) * width + x) as usize] == b'H' {
                 // sheep has escaped - this state can be discarded
                 moved += 1;
                 continue;
@@ -217,7 +217,7 @@ fn main() {
     println!("{total}");
 
     // part 3
-    let (width, height, grid) = parse("everybody_codes_e2025_q10_p3.txt");
+    let (width, height, mut grid) = parse("everybody_codes_e2025_q10_p3.txt");
 
     let mut dragon = (0, 0);
     let mut sheep = SheepMask::new();
@@ -234,5 +234,14 @@ fn main() {
         }
     }
 
-    println!("{}", dfs(sheep, dragon, &grid, width, height, &mut cache,));
+    // mark hideouts that stretch to the bottom as such
+    for x in 0..width {
+        let mut y = height - 1;
+        while y >= 0 && grid[(y * width + x) as usize] == b'#' {
+            grid[(y * width + x) as usize] = b'H';
+            y -= 1;
+        }
+    }
+
+    println!("{}", dfs(sheep, dragon, &grid, width, height, &mut cache));
 }
