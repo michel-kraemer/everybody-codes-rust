@@ -231,17 +231,11 @@ fn main() {
 
         // remove all grid cells of max_node from indices, so we don't visit
         // them anymore
-        indices = indices
-            .into_iter()
-            .filter(|i| {
-                let n = find(i.1.1 * width + i.1.0, &mut nodes);
-                n != max_node
-            })
-            .collect::<Vec<_>>();
+        indices.retain(|i| find(i.1.1 * width + i.1.0, &mut nodes) != max_node);
 
         // reset state for the next round
-        for i in 0..nodes.len() {
-            let n = find(i, &mut nodes);
+        for (_, (x, y)) in &indices {
+            let n = find(y * width + x, &mut nodes);
             nodes[n].children.clear();
             nodes[n].can_explode = nodes[n].size;
         }
