@@ -1,232 +1,167 @@
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap};
 use std::fs;
 
 pub const DIRS: [(i64, i64); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
 
-fn find_intersection(
-    wall: ((i64, i64), (i64, i64)),
-    path: ((i64, i64), (i64, i64)),
-) -> Option<(i64, i64)> {
-    if wall.0.0 == wall.1.0 {
-        // vertical wall
-        if path.0.0 == path.1.0 {
-            // vertical path
-            return None;
+type Wall = ((i64, i64), (i64, i64));
+
+/// Sort the given vertices using a key extraction function. Then iterate
+/// through all n sorted unique keys and map them to the interval [0,n).
+///
+/// Example:
+/// * Unsorted keys: `[2, 12, 2, 4, 4, 5, 0, 7, 8, 4, 2, 0]`
+/// * Sorted unique keys: `[0, 2, 4, 5, 7, 8, 12]`
+/// * Result: `{0: 0, 2: 1, 4: 2, 5: 3, 7: 4, 8: 5, 12: 6}`
+fn compress_coordinates_by<F>(vertices: &mut Vec<(i64, i64)>, mut f: F) -> HashMap<i64, i64>
+where
+    F: FnMut(&(i64, i64)) -> i64,
+{
+    vertices.sort_unstable_by_key(&mut f);
+    let mut last = i64::MAX;
+    let mut new = 0;
+    let mut map = HashMap::new();
+    for v in vertices {
+        let vv = f(v);
+        if vv != last {
+            map.insert(vv, new);
+            last = vv;
+            new += 1;
         }
-        // if path.0.1 < wall.0.1 || path.0.1 > wall.1.1 {
-        //     return None;
-        // }
-        if (path.0.0 < wall.0.0 && path.1.0 < wall.0.0)
-            || (path.0.0 > wall.0.0 && path.1.0 > wall.0.0)
-        {
-            return None;
-        }
-        Some((wall.0.0, path.0.1))
-    } else {
-        // horizontal wall
-        if path.0.1 == path.1.1 {
-            // horizontal path
-            return None;
-        }
-        // if path.0.0 < wall.0.0 || path.0.0 > wall.1.0 {
-        //     return None;
-        // }
-        if (path.0.1 < wall.0.1 && path.1.1 < wall.0.1)
-            || (path.0.1 > wall.0.1 && path.1.1 > wall.0.1)
-        {
-            return None;
-        }
-        Some((path.0.0, wall.0.1))
     }
+    map
 }
 
-fn is_on_wall(wall: ((i64, i64), (i64, i64)), pos: (i64, i64)) -> bool {
-    if wall.0.0 == wall.1.0 {
-        // vertical wall
-        pos.0 == wall.0.0 && pos.1 >= wall.0.1 && pos.1 <= wall.1.1
-    } else {
-        // horizontal wall
-        pos.1 == wall.0.1 && pos.0 >= wall.0.0 && pos.0 <= wall.1.0
+/// Reverse the given mapping and insert a left and a right border around each
+/// coordinate.
+///
+/// Example:
+/// ```text
+/// {    0: 0,     2: 1,     4: 2,     5: 3,     7: 4,     8: 5,      12: 6 }
+///      |         |         |         |         |         |           |
+/// [-1, 0, 1,  1, 2, 3,  3, 4, 5,  4, 5, 6,  6, 7, 8,  7, 8, 9,  11, 12, 13]
+/// ```
+fn revmap(map: &HashMap<i64, i64>) -> Vec<i64> {
+    let mut result = vec![0; map.len() * 3];
+    for (&old, &new) in map {
+        result[new as usize * 3] = old - 1;
+        result[new as usize * 3 + 1] = old;
+        result[new as usize * 3 + 2] = old + 1;
     }
+    result
+}
+
+/// Compress the given list of walls. Map the n unique x values to the interval
+/// [0,n) and the m unique y values to the interval [0,m). Then add a small
+/// border to the left and right of each value so there is space for us to
+/// travel through. Return the compressed walls and a mapping from compressed
+/// coordinates to real coordinates.
+fn compress(mut walls: Vec<Wall>) -> (Vec<Wall>, Vec<i64>, Vec<i64>) {
+    let mut vertices = walls.iter().map(|w| w.1).collect::<Vec<_>>();
+    vertices.push(walls[0].0);
+
+    // compress coordinates
+    let xmap = compress_coordinates_by(&mut vertices, |(x, _)| *x);
+    let ymap = compress_coordinates_by(&mut vertices, |(_, y)| *y);
+
+    // translate coordinates
+    for w in walls.iter_mut() {
+        w.0.0 = xmap[&w.0.0] * 3 + 1;
+        w.0.1 = ymap[&w.0.1] * 3 + 1;
+        w.1.0 = xmap[&w.1.0] * 3 + 1;
+        w.1.1 = ymap[&w.1.1] * 3 + 1;
+    }
+
+    // create reverse mapping
+    let xmaprev = revmap(&xmap);
+    let ymaprev = revmap(&ymap);
+
+    (walls, xmaprev, ymaprev)
 }
 
 fn main() {
-    // part 1
-    let input =
-        fs::read_to_string("everybody_codes_e2025_q15_p1.txt").expect("Could not read file");
-    let mut walls = HashSet::new();
-    let instr = input.trim().split(',').collect::<Vec<_>>();
-    let mut pos = (0, 0);
-    let mut dir: (i64, i64) = (0, -1);
-    for i in instr {
-        if i.starts_with("L") {
-            dir = (dir.1, -dir.0);
-        } else {
-            dir = (-dir.1, dir.0);
-        }
-        let steps = i[1..].parse::<i64>().unwrap();
-        for _ in 0..steps {
-            walls.insert(pos);
-            pos.0 += dir.0;
-            pos.1 += dir.1;
-        }
-    }
-
-    let mut seen = HashMap::new();
-    let mut queue = BinaryHeap::new();
-    queue.push(Reverse((0, pos.0, pos.1)));
-    seen.insert((pos.0, pos.1), 0);
-    while let Some(Reverse((steps, x, y))) = queue.pop() {
-        if x == 0 && y == 0 {
-            println!("{steps}");
-            break;
-        }
-        for (dx, dy) in DIRS {
-            let nx = x + dx;
-            let ny = y + dy;
-            if (nx == 0 && ny == 0) || !walls.contains(&(nx, ny)) {
-                let old = seen.get(&(nx, ny)).unwrap_or(&i64::MAX);
-                if steps < *old {
-                    seen.insert((nx, ny), steps);
-                    queue.push(Reverse((steps + 1, nx, ny)));
-                }
-            }
-        }
-    }
-
-    for part in [2, 3] {
-        let input = fs::read_to_string(format!("everybody_codes_e2025_q15_p{}.txt", part))
+    for part in 1..=3 {
+        // parse
+        let input = fs::read_to_string(format!("everybody_codes_e2025_q15_p{part}.txt"))
             .expect("Could not read file");
-        let mut all_walls = Vec::new();
-        let instr = input.trim().split(',').collect::<Vec<_>>();
+        let instructions = input.trim().split(',').collect::<Vec<_>>();
+
+        // parse walls to lines
         let mut pos = (0, 0);
         let mut dir: (i64, i64) = (0, -1);
-        for i in instr {
-            if i.starts_with("L") {
+        let mut walls = Vec::new();
+        for i in instructions {
+            if i.starts_with('L') {
                 dir = (dir.1, -dir.0);
             } else {
                 dir = (-dir.1, dir.0);
             }
             let steps = i[1..].parse::<i64>().unwrap();
+
             let a = pos;
-            for _ in 0..steps {
-                pos.0 += dir.0;
-                pos.1 += dir.1;
-            }
-            if a < pos {
-                all_walls.push((a, pos));
+            pos.0 += dir.0 * steps;
+            pos.1 += dir.1 * steps;
+            walls.push((a, pos));
+        }
+
+        // compress walls
+        let (walls, xmaprev, ymaprev) = compress(walls);
+        let width = xmaprev.len() as i64;
+        let height = ymaprev.len() as i64;
+
+        // create grid and draw compressed walls into it
+        let mut grid = vec![b'.'; (width * height) as usize];
+        for w in &walls {
+            if w.0.0 == w.1.0 {
+                // vertical wall
+                let sy = w.0.1.min(w.1.1);
+                let ey = w.0.1.max(w.1.1);
+                for y in sy..=ey {
+                    grid[(y * width + w.0.0) as usize] = b'#';
+                }
             } else {
-                all_walls.push((pos, a));
+                // horizontal wall
+                let sx = w.0.0.min(w.1.0);
+                let ex = w.0.0.max(w.1.0);
+                for x in sx..=ex {
+                    grid[(w.0.1 * width + x) as usize] = b'#';
+                }
             }
         }
 
-        // let f = 10000.0;
-        // let f = 0.5;
-
-        // println!("digraph G {{");
-        // for (i, w) in all_walls.iter().enumerate() {
-        //     println!(
-        //         "node{i}a [shape=point,pos=\"{},{}!\"];",
-        //         w.0.0 as f64 / f,
-        //         w.0.1 as f64 / f
-        //     );
-        //     println!(
-        //         "node{i}b [shape=point,pos=\"{},{}!\"];",
-        //         w.1.0 as f64 / f,
-        //         w.1.1 as f64 / f
-        //     );
-        //     println!("node{i}a->node{i}b;");
-        // }
-
-        let start = pos;
-
-        let mut min_x = i64::MAX;
-        let mut min_y = i64::MAX;
-        let mut max_x = i64::MIN;
-        let mut max_y = i64::MIN;
-        for w in &all_walls {
-            min_x = min_x.min(w.0.0);
-            min_x = min_x.min(w.1.0);
-            min_y = min_y.min(w.0.1);
-            min_y = min_y.min(w.1.1);
-
-            max_x = max_x.max(w.0.0);
-            max_x = max_x.max(w.1.0);
-            max_y = max_y.max(w.0.1);
-            max_y = max_y.max(w.1.1);
-        }
-
+        // perform Dijkstra's on the compressed grid but count steps in real world
         let mut seen = HashMap::new();
         let mut queue = BinaryHeap::new();
+        let dest = walls[0].0;
+        let pos = walls[walls.len() - 1].1;
         queue.push(Reverse((0, pos.0, pos.1)));
-        seen.insert((pos.0, pos.1), 0);
-        let mut z = 0;
-        let mut min_dist = i64::MAX;
+        seen.insert(pos, 0);
         while let Some(Reverse((steps, x, y))) = queue.pop() {
-            if x.abs() + y.abs() < min_dist {
-                min_dist = x.abs() + y.abs();
-                // println!("dist {min_dist} x {x} y {y} steps {steps}");
-            }
-            // println!("STEPS {steps} x {x} y {y}");
-            // println!(
-            //     "node{z} [shape=point,color=red,pos=\"{},{}!\"];",
-            //     x as f64 / f,
-            //     y as f64 / f
-            // );
-            // println!("{steps} {x} {y}");
-            if part == 2 && z > 12800 && y == 1 {
-                println!("{}", steps + x.abs() - 1);
-                break;
-            }
-            if part == 3 && z > 53000 && y == 1 {
-                println!("{}", steps + x.abs() - 1);
-                break;
-            }
-            z += 1;
-            if x == 0 && y == 0 {
+            let realx = xmaprev[x as usize];
+            let realy = ymaprev[y as usize];
+            if realx == 0 && realy == 0 {
                 println!("{steps}");
                 break;
             }
+
             for (dx, dy) in DIRS {
-                let nx = x + dx * 1_000_000_000_000;
-                let ny = y + dy * 1_000_000_000_000;
-                let mut min_dist = i64::MAX;
-                let mut min_inter = (i64::MAX, i64::MAX);
-                for w in &all_walls {
-                    let mut sx = x;
-                    let mut sy = y;
-                    if (sx, sy) == start {
-                        sx += dx;
-                        sy += dy;
-                    }
-                    if let Some(i) = find_intersection(*w, ((sx, sy), (nx, ny))) {
-                        let mut mx = i.0;
-                        let mut my = i.1;
-                        let on_wall = is_on_wall(*w, (mx, my));
-                        if on_wall {
-                            mx -= dx;
-                            my -= dy;
-                        } else {
-                            mx += dx;
-                            my += dy;
-                        }
-                        let dist = (x.abs_diff(mx) + y.abs_diff(my)) as i64;
-                        if dist < min_dist {
-                            min_dist = dist;
-                            min_inter = (mx, my);
-                        }
-                    }
-                }
-                if min_inter != (i64::MAX, i64::MAX) && min_inter != (x, y) {
-                    let old = seen.get(&(min_inter.0, min_inter.1)).unwrap_or(&i64::MAX);
-                    if steps + min_dist < *old {
-                        seen.insert((min_inter.0, min_inter.1), steps + min_dist);
-                        queue.push(Reverse((steps + min_dist, min_inter.0, min_inter.1)));
+                let nx = x + dx;
+                let ny = y + dy;
+                if nx >= 0
+                    && nx < width
+                    && ny >= 0
+                    && ny < height
+                    && ((nx, ny) == dest || grid[(ny * width + nx) as usize] != b'#')
+                {
+                    let realnx = xmaprev[nx as usize];
+                    let realny = ymaprev[ny as usize];
+                    let dist = (realnx - realx).abs() + (realny - realy).abs();
+                    if steps + dist < *seen.get(&(nx, ny)).unwrap_or(&i64::MAX) {
+                        seen.insert((nx, ny), steps + dist);
+                        queue.push(Reverse((steps + dist, nx, ny)));
                     }
                 }
             }
         }
-        // println!("}}");
     }
 }
