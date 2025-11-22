@@ -132,14 +132,12 @@ fn main() {
         // perform Dijkstra's on the compressed grid but count steps in real world
         let mut seen = vec![i64::MAX; grid.len()];
         let mut queue = BinaryHeap::new();
-        let dest = walls[0].0;
-        let pos = walls[walls.len() - 1].1;
+        let dest = walls[walls.len() - 1].1;
+        let pos = walls[0].0;
         queue.push(Reverse((0, pos.0, pos.1)));
         seen[(pos.1 * width + pos.0) as usize] = 0;
         while let Some(Reverse((steps, x, y))) = queue.pop() {
-            let realx = xmaprev[x as usize];
-            let realy = ymaprev[y as usize];
-            if realx == 0 && realy == 0 {
+            if (x, y) == dest {
                 println!("{steps}");
                 break;
             }
@@ -153,6 +151,8 @@ fn main() {
                     && ny < height
                     && ((nx, ny) == dest || grid[(ny * width + nx) as usize] != b'#')
                 {
+                    let realx = xmaprev[x as usize];
+                    let realy = ymaprev[y as usize];
                     let realnx = xmaprev[nx as usize];
                     let realny = ymaprev[ny as usize];
                     let dist = (realnx - realx).abs() + (realny - realy).abs();
