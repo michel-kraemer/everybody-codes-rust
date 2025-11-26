@@ -217,7 +217,7 @@ fn main() {
                 if (is_left && nx >= origin.0 + new_max_time as usize / 180)
                     || (!is_left && nx <= origin.0 - new_max_time as usize / 180)
                 {
-                    // optimization: don't go to far to the right if `is_left`
+                    // optimization: don't go too far to the right if `is_left`
                     // is `true` and vice-versa
                     continue;
                 }
@@ -226,14 +226,14 @@ fn main() {
                 let new_time = time + cost;
                 let old_time = seen[seen_idx(nx, ny, new_max_time, is_left, width, max_radius)];
                 if new_time < new_max_time && new_time < old_time {
-                    for nmt in (0..=new_max_time).step_by(30) {
-                        // Optimization: if we've found a new shortest path to this
-                        // cell, any path that gives us less time is worse, so we can
-                        // set the value of not only `new_max_time` to `new_time` but
-                        // also of all shorter max times. This reduces the number of
-                        // states we need to visit significantly.
-                        seen[seen_idx(nx, ny, nmt, is_left, width, max_radius)] = new_time;
-                    }
+                    // Optimization: if we've found a new shortest path to this
+                    // cell, any path that gives us less time is worse, so we can
+                    // set the value of not only `new_max_time` to `new_time` but
+                    // also of all shorter max times. This reduces the number of
+                    // states we need to visit significantly.
+                    let si = seen_idx(nx, ny, 0, is_left, width, max_radius);
+                    let ei = seen_idx(nx, ny, new_max_time, is_left, width, max_radius);
+                    seen[si..=ei].fill(new_time);
 
                     queue.push(State {
                         time: new_time,
