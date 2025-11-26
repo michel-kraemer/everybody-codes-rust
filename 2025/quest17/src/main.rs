@@ -92,10 +92,10 @@ fn seen_idx(
     width: usize,
     max_radius: usize,
 ) -> usize {
-    y * (width * max_radius * 2)
-        + x * (max_radius * 2)
-        + (max_time / 30) as usize * 2
-        + if is_left { 0 } else { 1 }
+    y * (width * 2 * max_radius)
+        + x * (2 * max_radius)
+        + if is_left { 0 } else { max_radius }
+        + (max_time / 30) as usize
 }
 
 fn main() {
@@ -224,10 +224,17 @@ fn main() {
 
                 let cost = grid[ny * width + nx];
                 let new_time = time + cost;
-                let si = seen_idx(nx, ny, new_max_time, is_left, width, max_radius);
-                let old_time = seen[si];
+                let old_time = seen[seen_idx(nx, ny, new_max_time, is_left, width, max_radius)];
                 if new_time < new_max_time && new_time < old_time {
-                    seen[si] = new_time;
+                    for nmt in (0..=new_max_time).step_by(30) {
+                        // Optimization: if we've found a new shortest path to this
+                        // cell, any path that gives us less time is worse, so we can
+                        // set the value of not only `new_max_time` to `new_time` but
+                        // also of all shorter max times. This reduces the number of
+                        // states we need to visit significantly.
+                        seen[seen_idx(nx, ny, nmt, is_left, width, max_radius)] = new_time;
+                    }
+
                     queue.push(State {
                         time: new_time,
                         max_time: new_max_time,
