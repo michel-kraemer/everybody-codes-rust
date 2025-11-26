@@ -1,5 +1,5 @@
 use std::{
-    cmp::Reverse,
+    cmp::Ordering,
     collections::{BinaryHeap, HashMap},
     fs,
 };
@@ -13,6 +13,27 @@ struct Input {
     grid: Vec<u64>,
     origin: (usize, usize),
     start: (usize, usize),
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+struct State {
+    time: u64,
+    max_time: u64,
+    x: usize,
+    y: usize,
+    is_left: bool,
+}
+
+impl Ord for State {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.time.cmp(&self.time)
+    }
+}
+
+impl PartialOrd for State {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 /// Parse the input file and return a tuple with the grid's width, height, and
@@ -127,26 +148,33 @@ fn main() {
     // that has two shortest paths and where the sum of the costs of these paths
     // is smaller than the time it takes the volcano to get to this cell.
     let mut queue = BinaryHeap::new();
-    queue.push(Reverse((
-        0,
-        start.0,
-        start.1,
-        get_radius(start.0, start.1, origin.0, origin.1) * 30,
-        true,
-    )));
-    queue.push(Reverse((
-        0,
-        start.0,
-        start.1,
-        get_radius(start.0, start.1, origin.0, origin.1) * 30,
-        false,
-    )));
-    let mut seen: HashMap<(usize, usize, u64, bool), u64> = HashMap::default();
+    queue.push(State {
+        time: 0,
+        max_time: get_radius(start.0, start.1, origin.0, origin.1) * 30,
+        x: start.0,
+        y: start.1,
+        is_left: true,
+    });
+    queue.push(State {
+        time: 0,
+        max_time: get_radius(start.0, start.1, origin.0, origin.1) * 30,
+        x: start.0,
+        y: start.1,
+        is_left: false,
+    });
+    let mut seen: HashMap<(usize, u64, bool), u64> = HashMap::default();
 
-    while let Some(Reverse((time, x, y, max_time, is_left))) = queue.pop() {
+    while let Some(State {
+        time,
+        max_time,
+        x,
+        y,
+        is_left,
+    }) = queue.pop()
+    {
         if x == origin.0 && y > origin.1 {
             let cost = grid[y * width + origin.0];
-            if let Some(other_time) = seen.get(&(x, y, max_time, !is_left)) {
+            if let Some(other_time) = seen.get(&(y * width + x, max_time, !is_left)) {
                 // we found two shortest paths, check if the sum of the times
                 // (minus the costs for the current cell, because it has been
                 // visited twice) is lower than the maximum time
@@ -182,12 +210,19 @@ fn main() {
                 }
 
                 let cost = grid[ny * width + nx];
+                let new_time = time + cost;
                 let old_time = seen
-                    .get(&(nx, ny, new_max_time, is_left))
+                    .get(&(ny * width + nx, new_max_time, is_left))
                     .unwrap_or(&u64::MAX);
-                if time + cost < new_max_time && time + cost < *old_time {
-                    seen.insert((nx, ny, new_max_time, is_left), time + cost);
-                    queue.push(Reverse((time + cost, nx, ny, new_max_time, is_left)));
+                if new_time < new_max_time && new_time < *old_time {
+                    seen.insert((ny * width + nx, new_max_time, is_left), new_time);
+                    queue.push(State {
+                        time: new_time,
+                        max_time: new_max_time,
+                        x: nx,
+                        y: ny,
+                        is_left,
+                    });
                 }
             }
         }
