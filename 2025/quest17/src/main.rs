@@ -1,8 +1,4 @@
-use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashMap},
-    fs,
-};
+use std::{cmp::Ordering, collections::BinaryHeap, fs};
 
 // Right, Down, Left, Up
 const DIRS: [(i64, i64); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
@@ -87,6 +83,21 @@ fn get_radius(x: usize, y: usize, origin_x: usize, origin_y: usize) -> u64 {
     (dx * dx + dy * dy).sqrt().ceil() as u64
 }
 
+#[inline]
+fn seen_idx(
+    x: usize,
+    y: usize,
+    max_time: u64,
+    is_left: bool,
+    width: usize,
+    max_radius: usize,
+) -> usize {
+    y * (width * max_radius * 2)
+        + x * (max_radius * 2)
+        + (max_time / 30) as usize * 2
+        + if is_left { 0 } else { 1 }
+}
+
 fn main() {
     // part 1
     let Input {
@@ -144,7 +155,7 @@ fn main() {
 
     // Perform Dijkstra's to find two shortest paths (one on the left and one on
     // the right side of the volcano) to each cell at column `origin.0` and
-    // below the volcano (i.e. y > `origin.y`). The answer is the first cell
+    // below the volcano (i.e. y > `origin.1`). The answer is the first cell
     // that has two shortest paths and where the sum of the costs of these paths
     // is smaller than the time it takes the volcano to get to this cell.
     let mut queue = BinaryHeap::new();
@@ -162,7 +173,8 @@ fn main() {
         y: start.1,
         is_left: false,
     });
-    let mut seen: HashMap<(usize, u64, bool), u64> = HashMap::default();
+    let max_radius = width / 2;
+    let mut seen = vec![u64::MAX; width * height * max_radius * 2];
 
     while let Some(State {
         time,
@@ -174,7 +186,8 @@ fn main() {
     {
         if x == origin.0 && y > origin.1 {
             let cost = grid[y * width + origin.0];
-            if let Some(other_time) = seen.get(&(y * width + x, max_time, !is_left)) {
+            let other_time = seen[seen_idx(x, y, max_time, !is_left, width, max_radius)];
+            if other_time != u64::MAX {
                 // we found two shortest paths, check if the sum of the times
                 // (minus the costs for the current cell, because it has been
                 // visited twice) is lower than the maximum time
@@ -211,11 +224,10 @@ fn main() {
 
                 let cost = grid[ny * width + nx];
                 let new_time = time + cost;
-                let old_time = seen
-                    .get(&(ny * width + nx, new_max_time, is_left))
-                    .unwrap_or(&u64::MAX);
-                if new_time < new_max_time && new_time < *old_time {
-                    seen.insert((ny * width + nx, new_max_time, is_left), new_time);
+                let si = seen_idx(nx, ny, new_max_time, is_left, width, max_radius);
+                let old_time = seen[si];
+                if new_time < new_max_time && new_time < old_time {
+                    seen[si] = new_time;
                     queue.push(State {
                         time: new_time,
                         max_time: new_max_time,
