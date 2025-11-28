@@ -1,7 +1,9 @@
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::BinaryHeap;
 use std::fs;
 use std::ops::Range;
+
+use rustc_hash::FxHashMap;
 
 struct Opening {
     x: usize,
@@ -9,7 +11,7 @@ struct Opening {
     height: usize,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 struct State {
     flaps: usize,
     x: usize,
@@ -61,7 +63,7 @@ fn shortest_path(openings: &[Opening], max_x: usize) -> usize {
         x: 0,
         y: 0,
     });
-    let mut seen: HashMap<(usize, usize), usize> = HashMap::new();
+    let mut seen: FxHashMap<(usize, usize), usize> = FxHashMap::default();
 
     while let Some(State { flaps, x, y }) = queue.pop() {
         if x == max_x {
@@ -70,22 +72,22 @@ fn shortest_path(openings: &[Opening], max_x: usize) -> usize {
 
         let nos = next_openings(x, openings);
         for no in nos {
-            let no_max_y = openings[no].y + openings[no].height;
-            if (openings[no].y > y && openings[no].y - y > openings[no].x - x)
-                || (no_max_y < y && y - no_max_y > openings[no].x - x)
-            {
-                // opening is unreachable
-                continue;
+            // every odd position is impossible to reach
+            let mut no_min_y = openings[no].y;
+            if !(no_min_y + openings[no].x).is_multiple_of(2) {
+                no_min_y += 1;
+            }
+            let mut no_max_y = openings[no].y + openings[no].height - 1;
+            if !(no_max_y + openings[no].x).is_multiple_of(2) {
+                no_max_y -= 1;
             }
 
-            // decide whether the opening is above or below us
-            let (step, mut ny, ey) = if y >= no_max_y {
-                (-1, no_max_y - 1, openings[no].y - 1)
-            } else {
-                (1, openings[no].y, no_max_y)
-            };
+            // compute reachable minimum and maximum positions
+            no_min_y = no_min_y.max(y.saturating_sub(openings[no].x - x));
+            no_max_y = no_max_y.min(y + (openings[no].x - x));
 
-            while (y >= no_max_y && ny > ey) || (y < no_max_y && ny < ey) {
+            // take 2 steps - every odd position is impossible to reach
+            for ny in (no_min_y..=no_max_y).step_by(2) {
                 let mut nx = x;
                 let mut new_flaps = flaps;
                 if ny > y {
@@ -95,20 +97,9 @@ fn shortest_path(openings: &[Opening], max_x: usize) -> usize {
                     nx += y - ny;
                 }
 
-                if nx > openings[no].x {
-                    // no need to go further - with any other ny, we would also
-                    // end up behind the opening
-                    break;
-                }
-
-                if (openings[no].x - nx) % 2 == 1 {
-                    // odd distances are impossible to reach
-                    ny = (ny as i64 + step) as usize;
-                    continue;
-                }
-
                 new_flaps += (openings[no].x - nx) / 2;
                 nx = openings[no].x;
+
                 let old = seen.get(&(nx, ny)).unwrap_or(&usize::MAX);
                 if new_flaps < *old {
                     seen.insert((nx, ny), new_flaps);
@@ -118,12 +109,6 @@ fn shortest_path(openings: &[Opening], max_x: usize) -> usize {
                         y: ny,
                     });
                 }
-
-                // take 2 steps - the next ny would lead to an odd distance
-                if (ny as i64 + step * 2) < 0 {
-                    break;
-                }
-                ny = (ny as i64 + step * 2) as usize;
             }
         }
     }
