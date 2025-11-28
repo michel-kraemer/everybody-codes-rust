@@ -100,9 +100,9 @@ fn shortest_path(openings: &[Opening], max_x: usize) -> usize {
                 new_flaps += (openings[no].x - nx) / 2;
                 nx = openings[no].x;
 
-                let old = seen.get(&(nx, ny)).unwrap_or(&usize::MAX);
+                let old = seen.entry((nx, ny)).or_insert(usize::MAX);
                 if new_flaps < *old {
-                    seen.insert((nx, ny), new_flaps);
+                    *old = new_flaps;
                     queue.push(State {
                         flaps: new_flaps,
                         x: nx,
