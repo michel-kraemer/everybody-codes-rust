@@ -3,17 +3,6 @@ use std::fs;
 // Right, Down, Left, Up
 const DIRS: [(i32, i32); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
 
-const CLOCKWISE: [(i32, i32); 8] = [
-    (1, 0),   // →
-    (1, 1),   // ↘︎
-    (0, 1),   // ↓
-    (-1, 1),  // ↙︎
-    (-1, 0),  // ←
-    (-1, -1), // ↖︎
-    (0, -1),  // ↑
-    (1, -1),  // ↗︎
-];
-
 struct Grid {
     width: usize,
     height: usize,
@@ -199,17 +188,26 @@ where
         steps += 1;
         grid.set(nx, ny, b'+');
 
-        // check if we need to fill
+        // Check if we need to fill. Optimization: we just need to check the
+        // three cells ahead of us.
         let mut needs_fill = false;
-        for (dx, dy) in CLOCKWISE {
-            let ox = nx + dx;
-            let oy = ny + dy;
-            if ox == pos.0 && oy == pos.1 {
-                continue;
+        if ins.0 != 0 {
+            for dy in [-1, 0, 1] {
+                let ox = nx + ins.0;
+                let oy = ny + dy;
+                if grid.has(ox, oy) && grid.get(ox, oy) != b'.' {
+                    needs_fill = true;
+                    break;
+                }
             }
-            if grid.has(ox, oy) && grid.get(ox, oy) != b'.' {
-                needs_fill = true;
-                break;
+        } else {
+            for dx in [-1, 0, 1] {
+                let ox = nx + dx;
+                let oy = ny + ins.1;
+                if grid.has(ox, oy) && grid.get(ox, oy) != b'.' {
+                    needs_fill = true;
+                    break;
+                }
             }
         }
 
