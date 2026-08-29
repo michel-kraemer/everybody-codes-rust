@@ -52,7 +52,6 @@ fn dfs<F>(
     pos: (i64, i64),
     next_dests: &mut F,
     illuminated: &mut HashSet<(i64, i64)>,
-    flies: &mut HashSet<(i64, i64)>,
     stop_at_visited: bool,
 ) where
     F: FnMut() -> Vec<(i64, i64)>,
@@ -61,34 +60,39 @@ fn dfs<F>(
         return;
     }
     illuminated.insert(pos);
-    flies.remove(&pos);
-
-    for d in [(-1, 0), (0, -1), (1, 0), (0, 1)] {
-        let mx = pos.0 + d.0;
-        let my = pos.1 + d.1;
-        if !illuminated.contains(&(mx, my)) {
-            flies.insert((mx, my));
-        }
-    }
 
     for dest in next_dests() {
         let nx = (pos.0 + dest.0) / 2;
         let ny = (pos.1 + dest.1) / 2;
-        dfs((nx, ny), next_dests, illuminated, flies, stop_at_visited);
+        dfs((nx, ny), next_dests, illuminated, stop_at_visited);
     }
+}
+
+fn flies(illuminated: &HashSet<(i64, i64)>) -> usize {
+    let mut result: HashSet<(i64, i64)> = HashSet::new();
+
+    for i in illuminated {
+        for d in [(-1, 0), (0, -1), (1, 0), (0, 1)] {
+            let nx = i.0 + d.0;
+            let ny = i.1 + d.1;
+            if !illuminated.contains(&(nx, ny)) {
+                result.insert((nx, ny));
+            }
+        }
+    }
+
+    result.len()
 }
 
 fn main() {
     // part 1
     let config = parse("everybody_codes_e4_q02_p1.txt");
     let mut illuminated = HashSet::new();
-    let mut flies = HashSet::new();
     let mut mi = config.moves.iter();
     dfs(
         config.start,
         &mut || mi.next().map(|dest| vec![*dest]).unwrap_or_default(),
         &mut illuminated,
-        &mut flies,
         false,
     );
     println!("{}", illuminated.len());
@@ -96,27 +100,23 @@ fn main() {
     // part 2
     let config = parse("everybody_codes_e4_q02_p2.txt");
     let mut illuminated = HashSet::new();
-    let mut flies = HashSet::new();
     let mut mi = config.moves.iter();
     dfs(
         config.start,
         &mut || mi.next().map(|dest| vec![*dest]).unwrap_or_default(),
         &mut illuminated,
-        &mut flies,
         false,
     );
-    println!("{}", flies.len());
+    println!("{}", flies(&illuminated));
 
     // part 3
     let config = parse("everybody_codes_e4_q02_p3.txt");
     let mut illuminated = HashSet::new();
-    let mut flies = HashSet::new();
     dfs(
         config.start,
         &mut || vec![config.a, config.b, config.c],
         &mut illuminated,
-        &mut flies,
         true,
     );
-    println!("{}", flies.len());
+    println!("{}", flies(&illuminated));
 }
