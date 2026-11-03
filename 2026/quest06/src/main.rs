@@ -7,12 +7,19 @@ fn parse(path: &str) -> HashMap<String, Vec<String>> {
     for l in input.lines() {
         let (to, from) = l.split_once(':').unwrap();
         let from = from.split(',').map(|f| f.to_string()).collect::<Vec<_>>();
-        for f in &from {
-            deps.entry(f.to_string()).or_default();
-        }
         deps.insert(to.to_string(), from);
     }
     deps
+}
+
+fn reverse_deps(deps: HashMap<String, Vec<String>>) -> HashMap<String, Vec<String>> {
+    let mut result: HashMap<String, Vec<String>> = HashMap::new();
+    for (k, v) in deps {
+        for f in v {
+            result.entry(f.clone()).or_default().push(k.clone());
+        }
+    }
+    result
 }
 
 fn get_incredients_transitive(
@@ -38,32 +45,24 @@ fn main() {
     println!("{}", incredients.len());
 
     // part 2
-    let deps = parse("everybody_codes_e2026_q06_p2.txt");
-    let mut total = 0;
-    for d in deps.keys() {
-        if **d == *"NULL" {
-            continue;
-        }
-        let mut incredients = HashSet::new();
-        get_incredients_transitive(d, &deps, &mut incredients);
-        if incredients.contains("NULL") {
-            total += 1;
-        }
-    }
-    println!("{total}");
+    let deps = reverse_deps(parse("everybody_codes_e2026_q06_p2.txt"));
+    let mut incredients = HashSet::new();
+    get_incredients_transitive("NULL", &deps, &mut incredients);
+    incredients.remove("NULL");
+    println!("{}", incredients.len());
 
     // part 3
-    let deps = parse("everybody_codes_e2026_q06_p3.txt");
-    let mut total = 0;
+    let deps = reverse_deps(parse("everybody_codes_e2026_q06_p3.txt"));
+    let mut counts: HashMap<String, usize> = HashMap::new();
     for d in deps.keys() {
-        if **d == *"NULL" {
-            continue;
-        }
-        let mut incredients = HashSet::new();
-        get_incredients_transitive(d, &deps, &mut incredients);
-        if incredients.iter().filter(|i| i.starts_with("NULL")).count() >= 2 {
-            total += 1;
+        if d.starts_with("NULL") {
+            let mut incredients = HashSet::new();
+            get_incredients_transitive(d, &deps, &mut incredients);
+            incredients.remove("NULL");
+            for i in incredients {
+                *counts.entry(i).or_default() += 1;
+            }
         }
     }
-    println!("{total}");
+    println!("{}", counts.into_iter().filter(|c| c.1 >= 2).count());
 }
