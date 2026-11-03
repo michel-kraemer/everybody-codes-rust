@@ -1,35 +1,34 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 
-fn parse(path: &str) -> HashMap<String, Vec<String>> {
-    let input = fs::read_to_string(path).expect("Could not read file");
-    let mut deps: HashMap<String, Vec<String>> = HashMap::new();
+fn parse(input: &str) -> HashMap<&str, Vec<&str>> {
+    let mut deps: HashMap<&str, Vec<&str>> = HashMap::new();
     for l in input.lines() {
         let (to, from) = l.split_once(':').unwrap();
-        let from = from.split(',').map(|f| f.to_string()).collect::<Vec<_>>();
-        deps.insert(to.to_string(), from);
+        let from = from.split(',').collect::<Vec<_>>();
+        deps.insert(to, from);
     }
     deps
 }
 
-fn reverse_deps(deps: HashMap<String, Vec<String>>) -> HashMap<String, Vec<String>> {
-    let mut result: HashMap<String, Vec<String>> = HashMap::new();
+fn reverse_deps<'a>(deps: HashMap<&'a str, Vec<&'a str>>) -> HashMap<&'a str, Vec<&'a str>> {
+    let mut result: HashMap<&str, Vec<&str>> = HashMap::new();
     for (k, v) in deps {
         for f in v {
-            result.entry(f.clone()).or_default().push(k.clone());
+            result.entry(f).or_default().push(k);
         }
     }
     result
 }
 
-fn get_incredients_transitive(
+fn get_incredients_transitive<'a>(
     to: &str,
-    deps: &HashMap<String, Vec<String>>,
-    result: &mut HashSet<String>,
+    deps: &HashMap<&'a str, Vec<&'a str>>,
+    result: &mut HashSet<&'a str>,
 ) {
     if let Some(from) = deps.get(to) {
         for f in from {
-            if result.insert(f.to_string()) {
+            if result.insert(f) {
                 get_incredients_transitive(f, deps, result);
             }
         }
@@ -38,22 +37,28 @@ fn get_incredients_transitive(
 
 fn main() {
     // part 1
-    let deps = parse("everybody_codes_e2026_q06_p1.txt");
+    let input =
+        fs::read_to_string("everybody_codes_e2026_q06_p1.txt").expect("Could not read file");
+    let deps = parse(&input);
     let mut incredients = HashSet::new();
     get_incredients_transitive("NULL", &deps, &mut incredients);
     incredients.remove("NULL");
     println!("{}", incredients.len());
 
     // part 2
-    let deps = reverse_deps(parse("everybody_codes_e2026_q06_p2.txt"));
+    let input =
+        fs::read_to_string("everybody_codes_e2026_q06_p2.txt").expect("Could not read file");
+    let deps = reverse_deps(parse(&input));
     let mut incredients = HashSet::new();
     get_incredients_transitive("NULL", &deps, &mut incredients);
     incredients.remove("NULL");
     println!("{}", incredients.len());
 
     // part 3
-    let deps = reverse_deps(parse("everybody_codes_e2026_q06_p3.txt"));
-    let mut counts: HashMap<String, usize> = HashMap::new();
+    let input =
+        fs::read_to_string("everybody_codes_e2026_q06_p3.txt").expect("Could not read file");
+    let deps = reverse_deps(parse(&input));
+    let mut counts: HashMap<&str, usize> = HashMap::new();
     for d in deps.keys() {
         if d.starts_with("NULL") {
             let mut incredients = HashSet::new();
