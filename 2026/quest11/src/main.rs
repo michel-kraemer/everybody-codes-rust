@@ -1,4 +1,4 @@
-use std::fs;
+use std::{collections::VecDeque, fs};
 
 fn parse(path: &str) -> (usize, Vec<(usize, usize)>) {
     let input = fs::read_to_string(path).expect("Could not read file");
@@ -12,6 +12,17 @@ fn parse(path: &str) -> (usize, Vec<(usize, usize)>) {
         additional_connections.push((a, b));
     }
     (portals, additional_connections)
+}
+
+fn create_initial_connections(portals: usize, neighbors: usize) -> Vec<Vec<usize>> {
+    let mut connections = vec![Vec::new(); portals];
+    for (i, c) in connections.iter_mut().enumerate() {
+        for j in 1..=neighbors {
+            c.push((i + j) % portals);
+            c.push((i + portals - j) % portals);
+        }
+    }
+    connections
 }
 
 /// Create a list of all possible pairings
@@ -28,7 +39,6 @@ fn pairs(
     for i in start..list.len() {
         let a = list[i];
         if a != usize::MAX {
-            list[i] = usize::MAX;
             for j in i + 1..list.len() {
                 let b = list[j];
                 if b != usize::MAX {
@@ -39,7 +49,7 @@ fn pairs(
                     list[j] = b;
                 }
             }
-            list[i] = a;
+            break;
         }
     }
 }
@@ -49,13 +59,13 @@ fn pairs(
 fn shortest(from: usize, connections: &[Vec<usize>], portals: usize) -> usize {
     let mut min_steps = vec![usize::MAX; portals];
     min_steps[from] = 0;
-    let mut queue = Vec::new();
-    queue.push((from, 0));
-    while let Some((pos, steps)) = queue.pop() {
+    let mut queue = VecDeque::with_capacity(32);
+    queue.push_back((from, 0));
+    while let Some((pos, steps)) = queue.pop_front() {
         for &n in &connections[pos] {
             if min_steps[n] > steps + 1 {
                 min_steps[n] = steps + 1;
-                queue.push((n, steps + 1));
+                queue.push_back((n, steps + 1));
             }
         }
     }
@@ -66,11 +76,7 @@ fn main() {
     // part 1
     let (portals, additional_connections) = parse("everybody_codes_e2026_q11_p1.txt");
 
-    let mut connections = vec![Vec::new(); portals];
-    for (i, c) in connections.iter_mut().enumerate() {
-        c.push((i + 1) % portals);
-        c.push((i + portals - 1) % portals);
-    }
+    let mut connections = create_initial_connections(portals, 1);
     let before = shortest(0, &connections, portals) * portals;
 
     for ac in additional_connections {
@@ -87,13 +93,7 @@ fn main() {
     // part 2
     let (portals, additional_connections) = parse("everybody_codes_e2026_q11_p2.txt");
 
-    let mut connections = vec![Vec::new(); portals];
-    for (i, c) in connections.iter_mut().enumerate() {
-        for j in 1..4 {
-            c.push((i + j) % portals);
-            c.push((i + portals - j) % portals);
-        }
-    }
+    let mut connections = create_initial_connections(portals, 3);
     let before = shortest(0, &connections, portals) * portals;
 
     for ac in additional_connections {
@@ -109,10 +109,9 @@ fn main() {
                 cl[a].push(b);
                 cl[b].push(a);
 
-                let mut sum = 0;
-                for i in 0..portals {
-                    sum += shortest(i, &cl, portals);
-                }
+                let sum = (0..portals)
+                    .map(|i| shortest(i, &cl, portals))
+                    .sum::<usize>();
                 min = min.min(sum);
             }
         }
@@ -122,13 +121,7 @@ fn main() {
     // part 3
     let (portals, additional_connections) = parse("everybody_codes_e2026_q11_p3.txt");
 
-    let mut connections = vec![Vec::new(); portals];
-    for (i, c) in connections.iter_mut().enumerate() {
-        for j in 1..4 {
-            c.push((i + j) % portals);
-            c.push((i + portals - j) % portals);
-        }
-    }
+    let mut connections = create_initial_connections(portals, 3);
     let before = shortest(0, &connections, portals) * portals;
 
     for ac in additional_connections {
@@ -141,28 +134,24 @@ fn main() {
 
     let mut min = usize::MAX;
     for start in 0..portals / 8 {
-        let mut crystals = Vec::new();
-        for i in 0..8 {
-            crystals.push(start + i * portals / 8);
-        }
-
         for pairing in &pairings {
             let mut cl = connections.clone();
             let mut ok = true;
             for p in pairing {
-                if connections[crystals[p.0]].contains(&crystals[p.1]) {
+                let c0 = start + p.0 * portals / 8;
+                let c1 = start + p.1 * portals / 8;
+                if connections[c0].contains(&c1) {
                     ok = false;
                     break;
                 }
-                cl[crystals[p.0]].push(crystals[p.1]);
-                cl[crystals[p.1]].push(crystals[p.0]);
+                cl[c0].push(c1);
+                cl[c1].push(c0);
             }
 
             if ok {
-                let mut sum = 0;
-                for i in 0..portals {
-                    sum += shortest(i, &cl, portals);
-                }
+                let sum = (0..portals)
+                    .map(|i| shortest(i, &cl, portals))
+                    .sum::<usize>();
                 min = min.min(sum);
             }
         }
