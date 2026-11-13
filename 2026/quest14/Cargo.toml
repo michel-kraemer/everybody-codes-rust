@@ -2,3 +2,10 @@
 name = "quest14"
 version = "0.1.0"
 edition = "2024"
+
+[features]
+visualize = ["scarlet", "skia-safe"]
+
+[dependencies]
+scarlet = { version = "1.2.0", optional = true }
+skia-safe = { version = "0.157.0", optional = true }

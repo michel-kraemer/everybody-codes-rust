@@ -111,10 +111,87 @@ fn mst(edges: HashMap<(u8, u8), usize>) -> usize {
     result
 }
 
+#[cfg(feature = "visualize")]
+fn visualize(grid: &[u8], width: usize, height: usize, path: &str, n_colors: u32) {
+    use scarlet::{
+        color::RGBColor,
+        colormap::{ColorMap as _, ListedColorMap},
+    };
+    use skia_safe::{Color, EncodedImageFormat, Paint, surfaces};
+
+    let mut surface = surfaces::raster_n32_premul((width as i32, height as i32)).expect("surface");
+
+    let color_map = ListedColorMap::turbo();
+    let mut steps = Vec::new();
+    for s in 1..=n_colors {
+        steps.push((1.0 / n_colors as f64) * s as f64);
+    }
+    let colors: Vec<Paint> = color_map
+        .transform(steps)
+        .into_iter()
+        .map(|c: RGBColor| {
+            let mut paint = Paint::default();
+            paint.set_color(Color::from_rgb(c.int_r(), c.int_g(), c.int_b()));
+            paint
+        })
+        .collect::<Vec<_>>();
+
+    let mut seen = vec![false; grid.len()];
+    for y in 0..height {
+        for x in 0..width {
+            if !seen[y * width + x] {
+                let b = grid[y * width + x];
+                let mut queue = Vec::new();
+                queue.push((x, y));
+                let mut points = Vec::new();
+                while let Some((xx, yy)) = queue.pop() {
+                    points.push((xx, yy));
+                    for (dx, dy) in DIRS {
+                        let nx = xx as i32 + dx;
+                        let ny = yy as i32 + dy;
+                        if nx >= 0
+                            && ny >= 0
+                            && (nx as usize) < width
+                            && (ny as usize) < height
+                            && !seen[ny as usize * width + nx as usize]
+                            && grid[ny as usize * width + nx as usize] == b
+                        {
+                            seen[ny as usize * width + nx as usize] = true;
+                            queue.push((nx as usize, ny as usize));
+                        }
+                    }
+                }
+
+                let col = &colors[points.len() % colors.len()];
+                for p in points {
+                    surface.canvas().draw_point((p.0 as i32, p.1 as i32), col);
+                }
+            }
+        }
+    }
+
+    let image = surface.image_snapshot();
+    let mut context = surface.direct_context();
+    let data = image
+        .encode(context.as_mut(), EncodedImageFormat::PNG, None)
+        .unwrap();
+    fs::write(path, data).unwrap();
+}
+
 fn main() {
     // part 1 - count the number of unique edges between pieces (including the
     // frame)
     let (width, height, grid) = parse_grid("everybody_codes_e2026_q14_p1.txt");
+
+    #[cfg(feature = "visualize")]
+    visualize(
+        &grid,
+        width,
+        height,
+        "everybody_codes_e2026_q14_p1.png",
+        220,
+    );
+
     let mut seen = HashSet::new();
     for y in 0..height {
         for x in 0..width {
@@ -139,12 +216,32 @@ fn main() {
 
     // part 2 - Minimum Spanning Tree
     let (width, height, grid) = parse_grid("everybody_codes_e2026_q14_p2.txt");
+
+    #[cfg(feature = "visualize")]
+    visualize(
+        &grid,
+        width,
+        height,
+        "everybody_codes_e2026_q14_p2.png",
+        220,
+    );
+
     let edges = find_unique_edges(grid, width, height);
     println!("{}", mst(edges));
 
     // part 3 - iterate over each pair of pieces A and B, remove A and B, and
     // connect all their neighbors to each other using a 0-weight edge
     let (width, height, grid) = parse_grid("everybody_codes_e2026_q14_p3.txt");
+
+    #[cfg(feature = "visualize")]
+    visualize(
+        &grid,
+        width,
+        height,
+        "everybody_codes_e2026_q14_p3.png",
+        10000,
+    );
+
     let edges = find_unique_edges(grid, width, height);
 
     let mut neighbors: Vec<HashSet<u8>> = vec![HashSet::new(); 255];
