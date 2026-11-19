@@ -21,35 +21,30 @@ fn parse(path: &str) -> Vec<(usize, usize, usize)> {
 fn compute(stacks: Vec<(usize, usize, usize)>) -> usize {
     let mut fill = 0;
     for (i, s) in stacks.iter().enumerate().skip(1) {
-        // Find all 'visible' stacks to the left. Visible stacks are those whose
-        // view is not blocked by other stacks.
-        let mut prev_stacks = Vec::new();
-        let mut max = 0;
+        // Find all 'visible' stacks (skyscrapers) to the left (in increasing
+        // order of height). Visible stacks are those whose view is not blocked
+        // by other stacks. For each visible stack X, compute how much empty
+        // cells between the current stack I and X are visible.
+        let mut prev_height = 0;
         for x in (0..i).rev() {
-            let m = s.1.min(stacks[x].1);
-            if m > max {
-                // stack is visible
-                prev_stacks.push(stacks[x]);
-                max = m;
+            if stacks[x].1 > prev_height {
+                // Stack is visible. Compute empty cells between I and X but
+                // only those that are above the previous height.
+                let w = s.0 - (stacks[x].0 + stacks[x].2);
+                let h = stacks[x].1.min(s.1) - prev_height;
+                fill += w * h;
+                prev_height = stacks[x].1;
             }
 
             if stacks[x].1 > s.1 {
-                // Stop if stack is taller than the current stack. There can be
-                // no other visible stack.
+                // Stop if X is taller than the current stack. There can be no
+                // other visible stack.
                 break;
             }
         }
-
-        // fill gaps
-        let mut prev_height = 0;
-        for p in prev_stacks {
-            let w = s.0 - (p.0 + p.2);
-            let h = p.1.min(max) - prev_height;
-            fill += w * h;
-            prev_height = p.1;
-        }
     }
 
+    // count the stacks too
     fill + stacks.iter().map(|s| s.1 * s.2).sum::<usize>()
 }
 
