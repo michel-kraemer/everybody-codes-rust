@@ -2,7 +2,10 @@ use itertools::Itertools;
 use std::cmp::Reverse;
 use std::fs;
 
-fn combine(block1: &[u8], block2: impl Iterator<Item = u8>) -> u64 {
+#[cfg(feature = "visualize")]
+mod visualize;
+
+pub fn combine(block1: &[u8], block2: impl Iterator<Item = u8>) -> u64 {
     let mut counts = [0; 26];
     for (&(mut c1), mut c2) in block1.iter().zip(block2) {
         if c2 < c1 {
@@ -107,4 +110,12 @@ fn main() {
     // multiply the largest three numbers
     counts.sort_unstable();
     println!("{}", counts[1] * counts[2] * counts[3]);
+
+    // optional visualization
+    #[cfg(feature = "visualize")]
+    {
+        visualize::visualize1();
+        visualize::visualize2();
+        visualize::visualize3();
+    }
 }
